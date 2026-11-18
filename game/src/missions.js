@@ -4,10 +4,8 @@
 // the plot; taxi fares and courier runs pay the bills between them.
 // A mission is data: steps with a kind, a target and a line of dialogue.
 
-import { CAR_DEFS, PALETTE } from './config.js';
-import { makeCar } from './cars.js';
-import { spawnThug } from './combat.js';
-import { dist } from './random.js';
+import { CAR_DEFS } from './config.js';
+import { dist2d } from './random.js';
 
 export const STORY = {
   hero: 'Dario Venn',
@@ -109,7 +107,6 @@ export function createMissions(city) {
     active: false,
     finished: false,
     sideJob: null,
-    sideTimer: 0,
     markerCar: null,
     escapeSet: false,
   };
@@ -180,7 +177,7 @@ function ensureStepSetup(missions, world) {
   if (!step) return;
   if (step.kind === 'steal' && !missions.markerCar) {
     const place = missions.city.places.marina;
-    const car = makeCar(CAR_DEFS.sport, '#e87e2e', place.x + 60, place.y + 40, Math.PI / 2);
+    const car = world.spawnCar(CAR_DEFS.sport, 0xe87e2e, place.x + 60, place.y + 40, Math.PI / 2, 'civil');
     car.isMissionCar = true;
     world.parked.push(car);
     missions.markerCar = car;
@@ -190,7 +187,7 @@ function ensureStepSetup(missions, world) {
     missions.kills = 0;
     const place = missions.city.places[step.place];
     for (let i = 0; i < step.count + 1; i += 1) {
-      spawnThug(world.combat, place.x + (Math.random() - 0.5) * 320, place.y + (Math.random() - 0.5) * 320, world.rng, true);
+      world.spawnThug(place.x + (Math.random() - 0.5) * 32, place.y + (Math.random() - 0.5) * 32, true);
     }
   }
   if (step.kind === 'timed' && missions.timer <= 0 && missions.stepIndex > 0) {
@@ -246,9 +243,9 @@ export function updateMissions(missions, dt, world) {
     return events;
   }
   if (step.kind === 'escape') {
-    const nearPolice = world.police.cars.some((c) => dist(px, py, c.x, c.y) < 420);
+    const nearPolice = world.police.cars.some((c) => dist2d(px, py, c.x, c.y) < 420);
     const place = missions.city.places[step.place];
-    const arrived = place && dist(px, py, place.x, place.y) < 110;
+    const arrived = place && dist2d(px, py, place.x, place.y) < 110;
     if (arrived && !nearPolice) {
       advanceStep(missions, world, events);
     } else if (arrived && nearPolice) {
@@ -257,7 +254,7 @@ export function updateMissions(missions, dt, world) {
     return events;
   }
   const place = missions.city.places[step.place];
-  if (place && dist(px, py, place.x, place.y) < 110) {
+  if (place && dist2d(px, py, place.x, place.y) < 110) {
     advanceStep(missions, world, events);
   }
   return events;
@@ -287,7 +284,7 @@ function updateSideJob(missions, dt, world, events) {
   const py = world.playerCar ? world.playerCar.y : player.y;
   const targetX = job.pickedUp ? job.tx : job.x;
   const targetY = job.pickedUp ? job.ty : job.y;
-  if (dist(px, py, targetX, targetY) < 90) {
+  if (dist2d(px, py, targetX, targetY) < 90) {
     if (!job.pickedUp) {
       job.pickedUp = true;
       job.label = job.kind === 'taxi' ? 'Taxi fare: drive the passenger to the marker' : 'Courier: deliver the parcel to the marker';

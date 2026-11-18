@@ -1,19 +1,23 @@
-// Seeded randomness and small math helpers for Solmar.
-// Every system that needs determinism (city layout, screenshot staging)
-// takes its randomness from here, so a seed always rebuilds the same city.
-
-export function mulberry32(seed) {
-  let a = seed >>> 0;
-  return function next() {
-    a |= 0; a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+// Seeded random numbers for Solmar. One seed builds one city, so the same
+// seed always deals the same streets, buildings and traffic. The generator
+// is a small xorshift-style hash: cheap, deterministic, and good enough for
+// a game that only needs shuffled-looking variety, not cryptography.
 
 export function makeRandom(seed) {
-  const next = mulberry32(seed);
+  let a = (seed >>> 0) || 1;
+  let b = (a ^ 0x9e3779b9) >>> 0;
+  let c = (b ^ 0x85ebca6b) >>> 0;
+  let d = (c ^ 0xc2b2ae35) >>> 0;
+  function next() {
+    const t = (a + b) | 0;
+    a = b ^ (b >>> 9);
+    b = (c + (c << 3)) | 0;
+    c = (c << 21) | (c >>> 11);
+    d = (d + 1) | 0;
+    const u = (t + d) | 0;
+    c = (c + u) | 0;
+    return ((u >>> 0) % 100000) / 100000;
+  }
   return {
     next,
     float(min, max) { return min + next() * (max - min); },
@@ -24,8 +28,8 @@ export function makeRandom(seed) {
   };
 }
 
-export function clamp(value, min, max) {
-  return value < min ? min : value > max ? max : value;
+export function clamp(v, min, max) {
+  return v < min ? min : v > max ? max : v;
 }
 
 export function lerp(a, b, t) {
@@ -39,44 +43,8 @@ export function angleLerp(a, b, t) {
   return a + d * t;
 }
 
-export function angleTo(x1, y1, x2, y2) {
-  return Math.atan2(y2 - y1, x2 - x1);
-}
-
-export function dist(x1, y1, x2, y2) {
-  return Math.hypot(x2 - x1, y2 - y1);
-}
-
-export function circleHitsRect(cx, cy, r, rx, ry, rw, rh) {
-  const nx = clamp(cx, rx, rx + rw);
-  const ny = clamp(cy, ry, ry + rh);
-  const dx = cx - nx;
-  const dy = cy - ny;
-  return dx * dx + dy * dy < r * r;
-}
-
-export function pushCircleOutOfRect(circle, rx, ry, rw, rh) {
-  const nx = clamp(circle.x, rx, rx + rw);
-  const ny = clamp(circle.y, ry, ry + rh);
-  let dx = circle.x - nx;
-  let dy = circle.y - ny;
-  const d = Math.hypot(dx, dy);
-  if (d === 0) {
-    const left = circle.x - rx;
-    const right = rx + rw - circle.x;
-    const top = circle.y - ry;
-    const bottom = ry + rh - circle.y;
-    const m = Math.min(left, right, top, bottom);
-    if (m === left) { circle.x = rx - circle.r; }
-    else if (m === right) { circle.x = rx + rw + circle.r; }
-    else if (m === top) { circle.y = ry - circle.r; }
-    else { circle.y = ry + rh + circle.r; }
-    return true;
-  }
-  if (d < circle.r) {
-    circle.x = nx + (dx / d) * circle.r;
-    circle.y = ny + (dy / d) * circle.r;
-    return true;
-  }
-  return false;
+export function dist2d(ax, ay, bx, by) {
+  const dx = ax - bx;
+  const dy = ay - by;
+  return Math.sqrt(dx * dx + dy * dy);
 }

@@ -1,8 +1,8 @@
-// Procedural Solmar: roads on a grid, city blocks with buildings, parks,
-// a beach and sea to the south, a harbor basin to the east, and a downtown
-// core. Everything is generated from one seed, so the city is identical
-// every time the same seed is used. Buildings are solid rectangles; roads,
-// sidewalks and plazas are walkable and drivable.
+// Procedural Solmar: roads on a grid, city blocks with low-poly buildings,
+// parks, a beach and sea to the south, a harbor basin to the east, and a
+// downtown core. Everything comes from one seed, so the city is identical
+// every run. Buildings are solid boxes; roads, sidewalks and plazas are
+// walkable and drivable. The renderer turns this data into meshes.
 
 import { WORLD, PALETTE } from './config.js';
 import { makeRandom, clamp } from './random.js';
@@ -14,7 +14,7 @@ export const DISTRICT_HOMES = 'homes';
 export const DISTRICT_WORKS = 'works';
 export const DISTRICT_MID = 'midtown';
 
-function roadCenters() {
+export function roadCenters() {
   const centers = [];
   const first = WORLD.roadPitch / 2;
   for (let i = 0; i < 10; i += 1) centers.push(first + i * WORLD.roadPitch);
@@ -54,6 +54,8 @@ export function createCity(seed) {
   const trees = [];
   const parks = [];
   const piers = [];
+  const lamps = [];
+  const umbrellas = [];
 
   const blockMin = WORLD.roadWidth / 2 + WORLD.sidewalk + 14;
   const blockMax = WORLD.roadPitch - WORLD.roadWidth / 2 - WORLD.sidewalk - 14;
@@ -84,77 +86,63 @@ export function createCity(seed) {
       for (let li = 0; li < lots; li += 1) {
         const col = li % cols;
         const row = Math.floor(li / cols);
-        const lx0 = bx0 + col * lotW + 10;
-        const ly0 = by0 + row * lotH + 10;
-        const lw = lotW - 20;
-        const lh = lotH - 20;
-        if (lw < 46 || lh < 46) continue;
-        const inset = rng.float(0.06, 0.2);
-        const bw = lw * (1 - inset);
-        const bh = lh * (1 - inset);
-        const bx = lx0 + (lw - bw) / 2;
-        const by = ly0 + (lh - bh) / 2;
-        let palette = PALETTE.buildingRoof;
-        let height = rng.int(6, 18);
-        if (district === DISTRICT_DOWNTOWN) { palette = PALETTE.downtownRoof; height = rng.int(22, 46); }
-        else if (district === DISTRICT_HOMES) { palette = PALETTE.houseRoof; height = rng.int(5, 9); }
-        else if (district === DISTRICT_WORKS) { palette = PALETTE.warehouseRoof; height = rng.int(8, 14); }
-        buildings.push({
-          x: bx, y: by, w: bw, h: bh,
-          color: rng.pick(palette),
-          height,
-          district,
-          name: null,
-          // Facade variety from the lot's position, so the seeded random
-          // sequence is untouched: ~40% dotted windows, ~30% solid,
-          // ~30% horizontal floor stripes. Awnings mark the shops.
-          facade: (Math.abs(bx * 31 + by * 17) % 10) < 4 ? 'dots' : (Math.abs(bx * 31 + by * 17) % 10) < 7 ? 'solid' : 'stripes',
-          awning: district !== DISTRICT_HOMES && (Math.abs(bx * 13 + by * 29) % 10) < 3,
-        });
-        if (rng.chance(0.4)) {
-          trees.push({ x: lx0 + rng.float(8, lotW - 8), y: ly0 + rng.float(8, lotH - 8), r: rng.float(8, 12) });
+        const lx = bx0 + col * lotW;
+        const ly = by0 + row * lotH;
+        const pad = district === DISTRICT_DOWNTOWN ? 8 : 16;
+        const w = rng.float(lotW * 0.45, lotW - pad * 2);
+        const h = rng.float(lotH * 0.45, lotH - pad * 2);
+        const x = lx + (lotW - w) / 2 + rng.float(-6, 6);
+        const y = ly + (lotH - h) / 2 + rng.float(-6, 6);
+        let height;
+        let roof;
+        let wall;
+        if (district === DISTRICT_DOWNTOWN) {
+          height = rng.float(15, 45) * 10;
+          roof = rng.pick(PALETTE.downtownRoof);
+          wall = rng.pick(PALETTE.wallDowntown);
+        } else if (district === DISTRICT_HOMES) {
+          height = rng.float(4, 9) * 10;
+          roof = rng.pick(PALETTE.houseRoof);
+          wall = rng.pick(PALETTE.wall);
+        } else if (district === DISTRICT_WORKS) {
+          height = rng.float(6, 12) * 10;
+          roof = rng.pick(PALETTE.warehouseRoof);
+          wall = rng.pick(PALETTE.wall);
+        } else {
+          height = rng.float(8, 20) * 10;
+          roof = rng.pick(PALETTE.roof);
+          wall = rng.pick(PALETTE.wall);
         }
+        buildings.push({ x, y, w, h, height, roof, wall, district, tall: district === DISTRICT_DOWNTOWN });
+      }
+      if (district !== DISTRICT_WORKS && rng.chance(0.5)) {
+        trees.push({ x: bx0 + rng.float(10, 30), y: by0 + rng.float(10, 30), r: rng.float(9, 14) });
       }
     }
   }
 
-  // The tallest tower sits dead center: the Solmar Tower landmark.
-  const tower = { x: 2280, y: 2280, w: 240, h: 240, color: '#4a6b7a', height: 58, district: DISTRICT_DOWNTOWN, name: 'Solmar Tower' };
-  buildings.push(tower);
-
-  // Harbor piers jutting into the basin, with moored boats as decoration.
+  // Harbor piers jut into the basin, and the beach gets umbrellas.
   for (let i = 0; i < 3; i += 1) {
-    const py = 900 + i * 480;
-    piers.push({ x: WORLD.harborX, y: py, w: 300, h: 26 });
+    piers.push({ x: WORLD.harborX - 40, y: 900 + i * 480, w: 120, h: 40 });
   }
-
-  // Street props, seeded like everything else: lamps at intersections,
-  // bins and hydrants along the sidewalks, beach gear on the sand.
-  const props = [];
-  for (const cx of centers) {
-    for (const cy of centers) {
-      if ((cx + cy) % 960 !== 0) continue;
-      props.push({ kind: 'lamp', x: cx + WORLD.roadWidth / 2 + WORLD.sidewalk + 4, y: cy - WORLD.roadWidth / 2 - 8 });
-      props.push({ kind: 'lamp', x: cx - WORLD.roadWidth / 2 - WORLD.sidewalk - 4, y: cy + WORLD.roadWidth / 2 + 8 });
-    }
-  }
-  for (let i = 0; i < 36; i += 1) {
-    const p = randomSidewalkPoint();
-    props.push({ kind: 'bin', x: p.x, y: p.y });
-  }
-  for (let i = 0; i < 24; i += 1) {
-    const p = randomSidewalkPoint();
-    props.push({ kind: 'hydrant', x: p.x, y: p.y });
-  }
-  const beachProps = [];
-  for (let i = 0; i < 16; i += 1) {
-    const kind = rng.pick(['umbrella', 'umbrella', 'towel', 'towel', 'tower', 'boat']);
-    beachProps.push({
-      kind,
-      x: rng.float(120, WORLD.size - 120),
+  for (let i = 0; i < 14; i += 1) {
+    umbrellas.push({
+      x: rng.float(300, WORLD.size - 300),
       y: rng.float(WORLD.beachTop + 18, WORLD.seaTop - 26),
-      color: rng.pick(['#e86a6a', '#f2c94c', '#4fa3a5', '#c96bb0', '#e87e2e']),
+      color: rng.pick([0xe86a6a, 0xf2c94c, 0x4fa3a5, 0xc96bb0, 0xe87e2e]),
     });
+  }
+  // Lamp posts along every second road, on both sidewalks, clear of the
+  // third-person camera's line of sight down the road centre. They stand
+  // mid-block (v + 240), never at an intersection where the cross road
+  // would put one right in the middle of the traffic.
+  for (const c of centers) {
+    for (let v = 240; v < WORLD.size; v += 480) {
+      const mid = v + 240;
+      if (mid > 4700) continue;
+      lamps.push({ x: c + WORLD.roadWidth / 2 + 20, y: mid });
+      lamps.push({ x: mid, y: c - WORLD.roadWidth / 2 - 20 });
+    }
   }
 
   // Named places the missions and the HUD point at.
@@ -178,12 +166,12 @@ export function createCity(seed) {
     return null;
   }
 
+  // Push a circle out of any building it overlaps; returns true on a hit.
   function collideCircle(circle) {
     let hit = false;
     for (const b of buildings) {
       if (circle.x + circle.r > b.x && circle.x - circle.r < b.x + b.w &&
           circle.y + circle.r > b.y && circle.y - circle.r < b.y + b.h) {
-        // Push out along the smallest penetration axis.
         const pushLeft = (circle.x + circle.r) - b.x;
         const pushRight = (b.x + b.w) - (circle.x - circle.r);
         const pushUp = (circle.y + circle.r) - b.y;
@@ -234,7 +222,7 @@ export function createCity(seed) {
   }
 
   return {
-    seed, buildings, trees, parks, piers, places, centers, props, beachProps,
+    seed, buildings, trees, parks, piers, places, centers, lamps, umbrellas,
     buildingAt, collideCircle, randomRoadPoint, randomSidewalkPoint, randomParkedSpot, isInWater,
   };
 }

@@ -13,6 +13,12 @@
 // a minimap, a start screen and a save — all of it original, with
 // WebAudio-synthesized sound and no assets from anyone else.
 //
+// Rebuilt in 3D on the `3d` branch: the same city, story and systems, now
+// rendered with Three.js (vendored under game/vendor) and a third-person
+// camera. The 2D version stays on main as the fallback entry.
+// a minimap, a start screen and a save — all of it original, with
+// WebAudio-synthesized sound and no assets from anyone else.
+//
 // Serve it locally with `node serve.ts`, then open http://localhost:8080.
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts

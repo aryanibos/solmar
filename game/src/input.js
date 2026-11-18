@@ -23,12 +23,6 @@ export function createInput(canvas) {
   let actions = 0;
   let clicks = 0;
   const mouse = { x: 0, y: 0, down: false };
-  let aimAngle = 0;
-
-  function updateAim() {
-    // Aim in world space is resolved by main (it knows the camera); here we
-    // only keep the screen position of the pointer.
-  }
 
   window.addEventListener('keydown', (event) => {
     if (event.repeat) return;
@@ -50,7 +44,6 @@ export function createInput(canvas) {
     const rect = canvas.getBoundingClientRect();
     mouse.x = event.clientX - rect.left;
     mouse.y = event.clientY - rect.top;
-    updateAim();
   });
   canvas.addEventListener('pointerdown', (event) => {
     const rect = canvas.getBoundingClientRect();
@@ -73,8 +66,6 @@ export function createInput(canvas) {
     get handbrake() { return [...held].some((c) => HANDBRAKE.has(c)); },
     get mouseDown() { return mouse.down; },
     mouse,
-    get aimAngle() { return aimAngle; },
-    setAimAngle(a) { aimAngle = a; },
     takeClicks() {
       const taken = clicks;
       clicks = 0;
